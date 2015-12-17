@@ -17,10 +17,10 @@ package com.github.maasdi.mongo;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
 
-import com.mongodb.DBObject;
-import com.mongodb.ReadPreference;
-import com.mongodb.TaggableReadPreference;
+import com.mongodb.*;
 
 public enum NamedReadPreference {
 
@@ -56,15 +56,17 @@ public enum NamedReadPreference {
 
   public ReadPreference getTaggableReadPreference(DBObject firstTagSet, DBObject... remainingTagSets){
 
+    List<TagSet> tagsList = toTagsList(firstTagSet, remainingTagSets);
+
     switch (this){
       case PRIMARY_PREFERRED:
-        return ReadPreference.primaryPreferred(firstTagSet, remainingTagSets);
+        return ReadPreference.primaryPreferred(tagsList);
       case SECONDARY:
-        return ReadPreference.secondary(firstTagSet, remainingTagSets);
+        return ReadPreference.secondary(tagsList);
       case SECONDARY_PREFERRED:
-        return ReadPreference.secondaryPreferred(firstTagSet, remainingTagSets);
+        return ReadPreference.secondaryPreferred(tagsList);
       case NEAREST:
-        return ReadPreference.nearest(firstTagSet, remainingTagSets);
+        return ReadPreference.nearest(tagsList);
       default:
         return (pref instanceof TaggableReadPreference) ? pref : null;
     }
@@ -80,6 +82,32 @@ public enum NamedReadPreference {
       }
     }
     return foundPreference;
+  }
+
+  private static List<TagSet> toTagsList(DBObject firstTagSet, DBObject... remainingTagSets) {
+    ArrayList tagsList = new ArrayList(remainingTagSets.length + 1);
+    tagsList.add(toTags(firstTagSet));
+    DBObject[] var3 = remainingTagSets;
+    int var4 = remainingTagSets.length;
+
+    for(int var5 = 0; var5 < var4; ++var5) {
+      DBObject cur = var3[var5];
+      tagsList.add(toTags(cur));
+    }
+
+    return tagsList;
+  }
+
+  private static TagSet toTags(DBObject tagsDocument) {
+    ArrayList tagList = new ArrayList();
+    Iterator var2 = tagsDocument.keySet().iterator();
+
+    while(var2.hasNext()) {
+      String key = (String)var2.next();
+      tagList.add(new Tag(key, tagsDocument.get(key).toString()));
+    }
+
+    return new TagSet(tagList);
   }
 
 }

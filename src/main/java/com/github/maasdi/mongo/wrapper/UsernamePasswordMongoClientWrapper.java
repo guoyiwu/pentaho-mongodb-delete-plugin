@@ -19,6 +19,7 @@ import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.mongodb.client.MongoDatabase;
 import org.pentaho.di.core.encryption.Encr;
 import org.pentaho.di.core.exception.KettleException;
 import org.pentaho.di.core.logging.LogChannelInterface;
@@ -47,8 +48,6 @@ public class UsernamePasswordMongoClientWrapper extends NoAuthMongoClientWrapper
    *          the step meta data
    * @param vars
    *          variables to use
-   * @param cred
-   *          a configured MongoCredential for authentication (or null for no authentication)
    * @param log
    *          for logging
    * @return a configured MongoClient object
@@ -75,22 +74,20 @@ public class UsernamePasswordMongoClientWrapper extends NoAuthMongoClientWrapper
   @Override
   protected MongoClient getClient( MongoDbMeta meta, VariableSpace vars, LogChannelInterface log,
       List<ServerAddress> repSet, boolean useAllReplicaSetMembers, MongoClientOptions opts ) throws KettleException {
-    try {
+    //try {
       List<MongoCredential> credList = new ArrayList<MongoCredential>();
       credList.add( getCredential( meta, vars ) );
       return ( repSet.size() > 1 || ( useAllReplicaSetMembers && repSet.size() >= 1 ) ? new MongoClient( repSet,
           credList, opts ) : ( repSet.size() == 1 ? new MongoClient( repSet.get( 0 ), credList, opts )
           : new MongoClient( new ServerAddress( "localhost" ), credList, opts ) ) ); //$NON-NLS-1$
-    } catch ( UnknownHostException u ) {
-      throw new KettleException( u );
-    }
+    //} catch ( UnknownHostException u ) {
+    //  throw new KettleException( u );
+    //}
   }
 
   /**
    * Create a credentials object
    *
-   * @param dbName
-   *          the name of the database
    * @return a configured MongoCredential object
    */
   protected MongoCredential getCredential( MongoDbMeta meta, VariableSpace vars ) {
@@ -99,10 +96,10 @@ public class UsernamePasswordMongoClientWrapper extends NoAuthMongoClientWrapper
         vars.environmentSubstitute( meta.getAuthenticationPassword() ) ).toCharArray() );
   }
 
-  protected DB getDb( String dbName ) throws KettleException {
+  protected MongoDatabase getDb( String dbName ) throws KettleException {
     try {
-      DB result = getMongo().getDB( dbName );
-      authenticateWithDb( result );
+      MongoDatabase result = getMongo().getDatabase(dbName);
+      //authenticateWithDb( result );
       return result;
     } catch ( Exception e ) {
       if ( e instanceof KettleException ) {
@@ -114,11 +111,11 @@ public class UsernamePasswordMongoClientWrapper extends NoAuthMongoClientWrapper
   }
 
   protected void authenticateWithDb( DB db ) throws KettleException {
-    CommandResult comResult = db.authenticateCommand( user, password.toCharArray() );
-    if ( !comResult.ok() ) {
-      throw new KettleException( BaseMessages.getString( PKG,
-          "MongoUsernamePasswordWrapper.ErrorAuthenticating.Exception",
-          comResult.getErrorMessage() ) );
-    }
+//    CommandResult comResult = db.authenticateCommand( user, password.toCharArray() );
+//    if ( !comResult.ok() ) {
+//      throw new KettleException( BaseMessages.getString( PKG,
+//          "MongoUsernamePasswordWrapper.ErrorAuthenticating.Exception",
+//          comResult.getErrorMessage() ) );
+//    }
   }
 }

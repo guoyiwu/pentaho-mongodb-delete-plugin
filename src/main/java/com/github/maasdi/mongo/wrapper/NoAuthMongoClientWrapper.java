@@ -25,6 +25,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
+import org.bson.Document;
 import org.bson.types.BSONTimestamp;
 import org.bson.types.Binary;
 import org.bson.types.Code;
@@ -80,8 +83,6 @@ public class NoAuthMongoClientWrapper implements MongoClientWrapper {
    *          the step meta data
    * @param vars
    *          variables to use
-   * @param cred
-   *          a configured MongoCredential for authentication (or null for no authentication)
    * @param log
    *          for logging
    * @return a configured MongoClient object
@@ -169,12 +170,12 @@ public class NoAuthMongoClientWrapper implements MongoClientWrapper {
         }
       }
 
-      try {
+      //try {
         ServerAddress s = new ServerAddress( host, port );
         repSet.add( s );
-      } catch ( UnknownHostException u ) {
-        throw new KettleException( u );
-      }
+     // } catch ( UnknownHostException u ) {
+     //   throw new KettleException( u );
+     // }
     }
     // }
 
@@ -189,7 +190,7 @@ public class NoAuthMongoClientWrapper implements MongoClientWrapper {
 
   protected MongoClient getClient( MongoDbMeta meta, VariableSpace vars, LogChannelInterface log,
       List<ServerAddress> repSet, boolean useAllReplicaSetMembers, MongoClientOptions opts ) throws KettleException {
-    try {
+    //try {
       // Mongo's java driver will discover all replica set or shard
       // members (Mongos) automatically when MongoClient is constructed
       // using a list of ServerAddresses. The javadocs state that MongoClient
@@ -201,9 +202,9 @@ public class NoAuthMongoClientWrapper implements MongoClientWrapper {
       return ( repSet.size() > 1 || ( useAllReplicaSetMembers && repSet.size() >= 1 ) ? new MongoClient( repSet, opts )
           : ( repSet.size() == 1 ? new MongoClient( repSet.get( 0 ), opts ) : new MongoClient( new ServerAddress(
               "localhost" ), opts ) ) ); //$NON-NLS-1$
-    } catch ( UnknownHostException u ) {
-      throw new KettleException( u );
-    }
+    //} catch ( UnknownHostException u ) {
+    //  throw new KettleException( u );
+    //}
   }
 
   /**
@@ -320,8 +321,7 @@ public class NoAuthMongoClientWrapper implements MongoClientWrapper {
 
     if ( Const.isEmpty( writeConcern ) && Const.isEmpty( wTimeout ) && !journaled ) {
       // all defaults - timeout 0, journal = false, w = 1
-      concern = new WriteConcern();
-      concern.setWObject( new Integer( 1 ) );
+      concern = new WriteConcern(new Integer( 1 ));
 
       if ( log != null ) {
         log.logBasic( BaseMessages.getString( PKG, "MongoNoAuthWrapper.Message.ConfiguringWithDefaultWriteConcern" ) ); //$NON-NLS-1$
@@ -376,9 +376,9 @@ public class NoAuthMongoClientWrapper implements MongoClientWrapper {
     }
   }
 
-  protected DB getDb( String dbName ) throws KettleException {
+  protected MongoDatabase getDb( String dbName ) throws KettleException {
     try {
-      return getMongo().getDB( dbName );
+      return getMongo().getDatabase(dbName);
     } catch ( Exception e ) {
       if ( e instanceof KettleException ) {
         throw (KettleException) e;
@@ -391,23 +391,20 @@ public class NoAuthMongoClientWrapper implements MongoClientWrapper {
   /**
    * Get the set of collections for a MongoDB database.
    *
-   * @param meta
-   *          Input meta with connection information
-   * @param varSpace
-   *          Variable space to substitute variables with
    * @param dB
    *          Name of database
-   * @param username
-   *          Username to request collections on behalf of
-   * @param realPass
-   *          Password of user
    * @return Set of collections in the database requested.
    * @throws KettleException
    *           If an error occurs.
    */
   public Set<String> getCollectionsNames( String dB ) throws KettleException {
     try {
-      return getDb( dB ).getCollectionNames();
+      Set<String> collectionNames = new HashSet<String>();
+      Iterator<String> it = getDb( dB ).listCollectionNames().iterator();
+      while (it.hasNext()) {
+        collectionNames.add(it.next());
+      }
+      return collectionNames;
     } catch ( Exception e ) {
       if ( e instanceof KettleException ) {
         throw (KettleException) e;
@@ -429,12 +426,12 @@ public class NoAuthMongoClientWrapper implements MongoClientWrapper {
   public List<String> getLastErrorModes() throws KettleException {
     List<String> customLastErrorModes = new ArrayList<String>();
 
-    DB local = getDb( LOCAL_DB );
+    MongoDatabase local = getDb( LOCAL_DB );
     if ( local != null ) {
       try {
-        DBCollection replset = local.getCollection( REPL_SET_COLLECTION );
+        MongoCollection<Document> replset = local.getCollection(REPL_SET_COLLECTION);
         if ( replset != null ) {
-          DBObject config = replset.findOne();
+          Document config = replset.find().first();
 
           extractLastErrorModes( config, customLastErrorModes );
         }
@@ -450,7 +447,7 @@ public class NoAuthMongoClientWrapper implements MongoClientWrapper {
     return customLastErrorModes;
   }
 
-  protected void extractLastErrorModes( DBObject config, List<String> customLastErrorModes ) {
+  protected void extractLastErrorModes( Document config, List<String> customLastErrorModes ) {
     if ( config != null ) {
       Object settings = config.get( REPL_SET_SETTINGS );
 
@@ -468,7 +465,7 @@ public class NoAuthMongoClientWrapper implements MongoClientWrapper {
 
   public List<String> getIndexInfo( String dbName, String collection ) throws KettleException {
     try {
-      DB db = getDb( dbName );
+      MongoDatabase db = getDb( dbName );
 
       if ( db == null ) {
         throw new Exception( BaseMessages.getString( PKG, "MongoNoAuthWrapper.ErrorMessage.NonExistentDB", dbName ) ); //$NON-NLS-1$
@@ -478,18 +475,18 @@ public class NoAuthMongoClientWrapper implements MongoClientWrapper {
         throw new Exception( BaseMessages.getString( PKG, "MongoNoAuthWrapper.ErrorMessage.NoCollectionSpecified" ) ); //$NON-NLS-1$
       }
 
-      if ( !db.collectionExists( collection ) ) {
+      if ( !collectionExists(dbName, collection) ) {
         db.createCollection( collection, null );
       }
 
-      DBCollection coll = db.getCollection( collection );
+      MongoCollection coll = db.getCollection( collection );
       if ( coll == null ) {
         throw new Exception( BaseMessages.getString( PKG,
             "MongoNoAuthWrapper.ErrorMessage.UnableToGetInfoForCollection", //$NON-NLS-1$
             collection ) );
       }
 
-      List<DBObject> collInfo = coll.getIndexInfo();
+      List<DBObject> collInfo = coll.listIndexes();
       List<String> result = new ArrayList<String>();
       if ( collInfo == null || collInfo.size() == 0 ) {
         throw new Exception( BaseMessages.getString( PKG,
@@ -1132,5 +1129,22 @@ public class NoAuthMongoClientWrapper implements MongoClientWrapper {
   @Override
   public void dispose() {
     getMongo().close();
+  }
+
+  private boolean collectionExists(String dbName, String collection) throws KettleException {
+    try {
+      Iterator<String> it = getDb( dbName ).listCollectionNames().iterator();
+      while (it.hasNext()) {
+        if (it.next().equals(collection))
+          return true;
+      }
+      return false;
+    } catch ( Exception e ) {
+      if ( e instanceof KettleException ) {
+        throw (KettleException) e;
+      } else {
+        throw new KettleException( e );
+      }
+    }
   }
 }

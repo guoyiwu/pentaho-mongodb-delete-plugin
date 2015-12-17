@@ -263,8 +263,6 @@ public abstract class MongoDbMeta extends BaseStepMeta implements StepMetaInterf
 
   /**
    * Get the write concern to use
-   *
-   * @param co the write concern to use
    */
   public String getWriteConcern() {
     return m_writeConcern;

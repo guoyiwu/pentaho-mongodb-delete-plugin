@@ -251,17 +251,17 @@ public class MongoDbDelete extends BaseStep implements StepInterface {
 
         while (retrys <= m_writeRetries && !isStopped()) {
             WriteResult result = null;
-            CommandResult cmd = null;
+            boolean cmd = false;
             try {
                 logDetailed(BaseMessages.getString(PKG, "MongoDbDelete.Message.ExecutingQuery", deleteQuery));
                 result = data.getCollection().drop(deleteQuery);
 
-                cmd = result.getLastError();
-                if (cmd != null && !cmd.ok()) {
-                    String message = cmd.getErrorMessage();
-                    logError(BaseMessages.getString(PKG, "MongoDbDelete.ErrorMessage.MongoReported", message));
+                cmd = result.wasAcknowledged();
+                if (!cmd) {
+                    //String message = cmd.getErrorMessage();
+                    //logError(BaseMessages.getString(PKG, "MongoDbDelete.ErrorMessage.MongoReported", message));
 
-                    cmd.throwOnError();
+                    //cmd.throwOnError();
                 }
             } catch (MongoException me) {
                 lastEx = me;
@@ -279,7 +279,7 @@ public class MongoDbDelete extends BaseStep implements StepInterface {
                 }
             }
 
-            if (cmd != null && cmd.ok()) {
+            if (cmd) {
                 break;
             }
         }
